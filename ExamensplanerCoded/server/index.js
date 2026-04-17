@@ -47,6 +47,19 @@ function mockStructuredResult(subject, topic, textPreview = "") {
   };
 }
 
+function normalizeStructuredResult(data, subject, topic, text) {
+  const fallback = mockStructuredResult(subject, topic, text);
+  if (!data || typeof data !== "object") return fallback;
+
+  return {
+    summary: typeof data.summary === "string" && data.summary.trim() ? data.summary : fallback.summary,
+    flashcards: Array.isArray(data.flashcards) ? data.flashcards : fallback.flashcards,
+    quizQuestions: Array.isArray(data.quizQuestions) ? data.quizQuestions : fallback.quizQuestions,
+    openQuestions: Array.isArray(data.openQuestions) ? data.openQuestions : fallback.openQuestions,
+    examSchemas: Array.isArray(data.examSchemas) ? data.examSchemas : fallback.examSchemas,
+  };
+}
+
 app.post("/api/analyze-document", upload.single("file"), async (req, res) => {
   try {
     const file = req.file;
@@ -98,15 +111,18 @@ ${text}
 
     const content = response.output_text?.trim() || "";
     let structured;
+    let source = "openai";
     try {
       structured = JSON.parse(content);
     } catch {
       structured = mockStructuredResult(subject, topic, text);
+      source = "mock";
     }
+    const normalized = normalizeStructuredResult(structured, subject, topic, text);
 
     return res.json({
-      data: structured,
-      meta: { source: "openai" },
+      data: normalized,
+      meta: { source },
     });
   } catch (error) {
     return res.status(500).json({
